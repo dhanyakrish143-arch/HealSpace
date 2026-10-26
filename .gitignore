@@ -1,0 +1,12 @@
+﻿node_modules/
+*/node_modules/
+.env
+*/.env
+dist/
+build/
+*.log
+_patch*
+_inject*
+_smoke*
+.vscode/
+.DS_Store
