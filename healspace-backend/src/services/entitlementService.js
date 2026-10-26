@@ -1,39 +1,55 @@
-﻿// Tier Capabilities Matrix (Config-driven, no hardcoded values)
+﻿// src/services/entitlementService.js
+// Single source of truth for tier-based feature gating (Module 7 Specification)
+
 const TIER_CONFIG = {
-  free: {
+  FREE: {
     maxActiveClients: 5,
-    customDomain: false,
-    advancedAnalytics: false,
-    exportPdfInvoices: true,
-    noteTemplates: ["soap_basic"],
+    noteTemplates: ["freeform"],
+    analyticsDepth: "basic",
+    canExportPdf: false,
+    customBranding: false
   },
-  pro: {
-    maxActiveClients: 50,
-    customDomain: true,
-    advancedAnalytics: true,
-    exportPdfInvoices: true,
-    noteTemplates: ["soap_basic", "dap_protocol", "cbt_ladder"],
+  GROWTH: {
+    maxActiveClients: 25,
+    noteTemplates: ["freeform", "soap"],
+    analyticsDepth: "advanced",
+    canExportPdf: true,
+    customBranding: true
   },
-  practice: {
-    maxActiveClients: 9999,
-    customDomain: true,
-    advancedAnalytics: true,
-    exportPdfInvoices: true,
-    noteTemplates: ["soap_basic", "dap_protocol", "cbt_ladder", "biopsychosocial"],
-  },
+  PRO: {
+    maxActiveClients: Infinity,
+    noteTemplates: ["freeform", "soap", "dap"],
+    analyticsDepth: "full_aggregations",
+    canExportPdf: true,
+    customBranding: true
+  }
 };
 
-/**
- * Single source of truth for feature access
- * @param {string} tier - Current tier of the therapist ("free" | "pro" | "practice")
- * @param {string} featureKey - Feature name ("advancedAnalytics", "customDomain", etc.)
- * @returns {boolean}
- */
-exports.canAccess = (tier = "pro", featureKey) => {
-  const currentConfig = TIER_CONFIG[tier.toLowerCase()] || TIER_CONFIG.free;
-  return Boolean(currentConfig[featureKey]);
-};
+async function canAccess(therapistTier = "GROWTH", featureKey, context = {}) {
+  const tierSettings = TIER_CONFIG[therapistTier.toUpperCase()] || TIER_CONFIG.FREE;
 
-exports.getTierLimits = (tier = "pro") => {
-  return TIER_CONFIG[tier.toLowerCase()] || TIER_CONFIG.free;
+  switch (featureKey) {
+    case "ACTIVE_CLIENT_CAP":
+      return (context.currentClientCount || 0) < tierSettings.maxActiveClients;
+
+    case "SOAP_NOTE_TEMPLATE":
+      return tierSettings.noteTemplates.includes("soap");
+
+    case "DAP_NOTE_TEMPLATE":
+      return tierSettings.noteTemplates.includes("dap");
+
+    case "ADVANCED_ANALYTICS":
+      return tierSettings.analyticsDepth !== "basic";
+
+    case "PDF_INVOICE_EXPORT":
+      return Boolean(tierSettings.canExportPdf);
+
+    default:
+      return true;
+  }
+}
+
+module.exports = {
+  canAccess,
+  TIER_CONFIG
 };
