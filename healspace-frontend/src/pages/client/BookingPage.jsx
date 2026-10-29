@@ -7,7 +7,6 @@ const ALL_SLOTS = [
   "02:00 PM", "02:45 PM", "03:30 PM", "04:15 PM", "05:00 PM"
 ];
 
-// Clean self-contained inline SVG icons
 const CheckCircleIcon = () => (
   <svg className="w-10 h-10 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -40,19 +39,16 @@ export default function BookingPage() {
   const [selectedSlot, setSelectedSlot] = useState("");
   const [mode, setMode] = useState("teletherapy");
 
-  // Patient Intake States
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [concern, setConcern] = useState("");
 
-  // Confirmation & UI state
   const [bookingConfirmed, setBookingConfirmed] = useState(null);
   const [activeTab, setActiveTab] = useState("receipt");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  // Safe navigation back to home or therapist microsite
   const handleBackToHome = () => {
     if (window.history.length > 1) {
       navigate(-1);
@@ -118,10 +114,11 @@ export default function BookingPage() {
     }
   };
 
+  // CLIENT CONFIRMATION VIEW
   if (bookingConfirmed) {
     return (
       <div className="min-h-screen bg-[#faf8f5] text-stone-800 py-10 px-4 flex flex-col items-center">
-        {/* Top Navigation Bar */}
+        {/* Navigation Bar */}
         <div className="w-full max-w-2xl flex justify-between items-center mb-6">
           <button
             onClick={handleBackToHome}
@@ -143,6 +140,25 @@ export default function BookingPage() {
             Payment verified for <span className="font-semibold text-stone-800">{bookingConfirmed.client_name}</span>.
             Your session is confirmed for <span className="font-semibold">{bookingConfirmed.date}</span> at <span className="font-semibold">{bookingConfirmed.slot}</span>.
           </p>
+
+          {/* DIRECT CALL JOIN BUTTON FOR CLIENT */}
+          {bookingConfirmed.format === "teletherapy" && (
+            <div className="mt-6 p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex flex-col items-center gap-2">
+              <span className="text-xs font-semibold text-emerald-900">
+                Dr. Dhanya Krishna is available in the secure consultation room.
+              </span>
+              <button
+                type="button"
+                onClick={() => navigate(`/consultation/room/?role=client${bookingConfirmed._id}`)}
+                className="px-6 py-2.5 bg-emerald-900 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold uppercase tracking-wider shadow-md transition flex items-center gap-2"
+              >
+                <span>JOIN TELETHERAPY CALL NOW 🎥</span>
+              </button>
+              <span className="text-[10px] text-emerald-700 font-mono">
+                Room Link: http://localhost:5173/consultation/room/?role=client{bookingConfirmed._id}
+              </span>
+            </div>
+          )}
 
           <div className="flex justify-center gap-3 mt-8">
             <button
@@ -233,9 +249,9 @@ export default function BookingPage() {
     );
   }
 
+  // STANDARD INTAKE BOOKING FORM
   return (
     <div className="min-h-screen bg-[#faf8f5] text-stone-800 py-10 px-4 flex flex-col items-center">
-      {/* Top Navigation Bar with Back Button */}
       <div className="w-full max-w-2xl flex justify-between items-center mb-6">
         <button
           onClick={handleBackToHome}
@@ -248,7 +264,6 @@ export default function BookingPage() {
         </span>
       </div>
 
-      {/* Header Profile Card */}
       <div className="w-full max-w-2xl bg-white rounded-2xl shadow-sm border border-stone-200 p-6 mb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -270,7 +285,6 @@ export default function BookingPage() {
         </div>
       </div>
 
-      {/* Main Intake & Booking Form */}
       <form onSubmit={handleBooking} className="w-full max-w-2xl bg-white rounded-2xl shadow-sm border border-stone-200 p-8 space-y-8">
         {errorMsg && (
           <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg font-medium">
@@ -278,7 +292,6 @@ export default function BookingPage() {
           </div>
         )}
 
-        {/* 1. Consultation Mode */}
         <div>
           <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-3">
             1. Select Consultation Mode
@@ -322,7 +335,6 @@ export default function BookingPage() {
           </div>
         </div>
 
-        {/* 2. Date & Time Selection with Live Collision Disabling */}
         <div>
           <div className="flex justify-between items-center mb-3">
             <label className="text-xs font-bold uppercase tracking-wider text-stone-600">
@@ -369,7 +381,6 @@ export default function BookingPage() {
           </p>
         </div>
 
-        {/* 3. Patient Details */}
         <div className="space-y-4">
           <label className="block text-xs font-bold uppercase tracking-wider text-stone-600">
             3. Enter Patient Details
@@ -426,7 +437,6 @@ export default function BookingPage() {
           </div>
         </div>
 
-        {/* Submit */}
         <button
           type="submit"
           disabled={loading || !selectedSlot}
@@ -442,3 +452,4 @@ export default function BookingPage() {
     </div>
   );
 }
+

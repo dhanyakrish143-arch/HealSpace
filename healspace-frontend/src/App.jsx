@@ -1,4 +1,5 @@
-﻿import FloatingChatWidget from './components/FloatingChatWidget';
+﻿import ConsultationRoom from './pages/therapist/ConsultationRoom';
+import FloatingChatWidget from './components/FloatingChatWidget';
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
@@ -15,7 +16,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/consultation/room/:appointmentId" element={<ConsultationRoom />} />`n        <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/my-portal" element={<PatientPortal />} />
         <Route path="/:slug" element={<BookingPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

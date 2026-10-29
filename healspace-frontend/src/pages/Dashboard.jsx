@@ -4,12 +4,12 @@ import axios from "axios";
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("hours"); // Defaults to hours tab or appointments
+  const [activeTab, setActiveTab] = useState("hours");
   const [appointments, setAppointments] = useState([]);
   const [copied, setCopied] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // Global consultation parameters
+  // Fee & Session Settings
   const [fee, setFee] = useState(700);
   const [duration, setDuration] = useState("45");
   const [bufferTime, setBufferTime] = useState("15");
@@ -25,14 +25,29 @@ export default function Dashboard() {
     { day: "Sunday", enabled: false, start: "10:00 AM", end: "01:00 PM" }
   ]);
 
+  // SOAP Modal State
+  const [selectedApp, setSelectedApp] = useState(null);
+  const [soapData, setSoapData] = useState({
+    subjective: "",
+    objective: "",
+    assessment: "",
+    plan: "",
+    prescribed_regimen: ""
+  });
+  const [isSigned, setIsSigned] = useState(false);
+  const [savingNote, setSavingNote] = useState(false);
+
+  const TIME_OPTIONS = [
+    "08:00 AM", "08:30 AM", "09:00 AM", "09:30 AM", "10:00 AM", "10:30 AM", "11:00 AM",
+    "12:00 PM", "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM", "05:00 PM", "05:30 PM",
+    "06:00 PM", "06:30 PM", "07:00 PM", "08:00 PM"
+  ];
+
   useEffect(() => {
     fetchLiveAppointments();
-    // Load saved schedule if available
-    const saved = localStorage.getItem("practitioner_schedule");
-    if (saved) {
-      try {
-        setSchedule(JSON.parse(saved));
-      } catch (e) {}
+    const savedSchedule = localStorage.getItem("practitioner_schedule");
+    if (savedSchedule) {
+      try { setSchedule(JSON.parse(savedSchedule)); } catch (e) {}
     }
   }, []);
 
@@ -47,30 +62,79 @@ export default function Dashboard() {
     }
   };
 
-  // Toggle Day Open / Closed
   const toggleDay = (index) => {
-    setSchedule(prev => {
+    setSchedule((prev) => {
       const updated = [...prev];
       updated[index] = { ...updated[index], enabled: !updated[index].enabled };
       return updated;
     });
   };
 
-  // Update Day Time
   const updateDayTime = (index, field, value) => {
-    setSchedule(prev => {
+    setSchedule((prev) => {
       const updated = [...prev];
       updated[index] = { ...updated[index], [field]: value };
       return updated;
     });
   };
 
-  // Save Schedule
   const handleSaveSchedule = () => {
     localStorage.setItem("practitioner_schedule", JSON.stringify(schedule));
     localStorage.setItem("practitioner_pricing", JSON.stringify({ fee, duration, bufferTime }));
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3000);
+  };
+
+  const handleJoinSession = (appId) => {
+    navigate(`/consultation/room/${appId}?role=doctor`);
+  };
+
+  const handleOpenSoap = async (app) => {
+    setSelectedApp(app);
+    try {
+      const res = await axios.get(`http://localhost:5001/api/notes/appointment/${app._id}`);
+      if (res.data.success && res.data.note) {
+        setSoapData({
+          subjective: res.data.note.subjective || "",
+          objective: res.data.note.objective || "",
+          assessment: res.data.note.assessment || "",
+          plan: res.data.note.plan || "",
+          prescribed_regimen: res.data.note.prescribed_regimen || ""
+        });
+        setIsSigned(Boolean(res.data.note.is_signed));
+      }
+    } catch (err) {
+      console.error("Could not fetch note", err);
+    }
+  };
+
+  const handleSaveSoap = async (signNow = false) => {
+    if (!selectedApp) return;
+    setSavingNote(true);
+    try {
+      const res = await axios.post("http://localhost:5001/api/notes/save", {
+        appointment_id: selectedApp._id,
+        therapist_slug: "dhanya-krishna",
+        client_name: selectedApp.client_name,
+        client_email: selectedApp.client_email,
+        ...soapData,
+        is_signed: signNow ? true : isSigned
+      });
+
+      if (res.data.success) {
+        if (signNow) {
+          setIsSigned(true);
+          alert(`Clinical SOAP Note signed and Prescription (Rx) unlocked for ${selectedApp.client_name}!`);
+        } else {
+          alert("SOAP draft saved successfully.");
+        }
+        fetchLiveAppointments();
+      }
+    } catch (err) {
+      alert("Failed to save note: " + err.message);
+    } finally {
+      setSavingNote(false);
+    }
   };
 
   const copyPatientUrl = () => {
@@ -80,12 +144,6 @@ export default function Dashboard() {
   };
 
   const totalRevenue = appointments.reduce((sum, item) => sum + (item.amount_paid || 700), 0);
-
-  const TIME_OPTIONS = [
-    "08:00 AM", "08:30 AM", "09:00 AM", "09:30 AM", "10:00 AM", "10:30 AM", "11:00 AM",
-    "12:00 PM", "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM", "05:00 PM", "05:30 PM",
-    "06:00 PM", "06:30 PM", "07:00 PM", "08:00 PM"
-  ];
 
   return (
     <div className="min-h-screen bg-[#faf8f5] text-stone-800 p-8">
@@ -120,7 +178,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Practitioner Card */}
+      {/* Practitioner Profile Overview Card */}
       <div className="max-w-6xl mx-auto bg-white rounded-2xl border border-stone-200 p-6 shadow-sm mb-6">
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-4">
@@ -151,7 +209,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Link Share Banner */}
         <div className="mt-6 bg-[#f4f7f4] border border-emerald-100 rounded-xl p-3.5 flex justify-between items-center">
           <span className="text-xs font-mono text-emerald-900">
             <span className="font-semibold text-stone-700 font-sans">Client Booking Link: </span>
@@ -166,7 +223,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs Layout */}
       <div className="max-w-6xl mx-auto bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
         <div className="flex border-b border-stone-200 px-6 pt-3 gap-8 text-xs font-semibold uppercase tracking-wider text-stone-500">
           {[
@@ -195,7 +252,7 @@ export default function Dashboard() {
               <div className="flex justify-between items-center mb-6">
                 <div>
                   <h3 className="font-serif font-bold text-xl text-stone-900">Your Appointments</h3>
-                  <p className="text-xs text-stone-400">Manage real live patient bookings from MongoDB Atlas.</p>
+                  <p className="text-xs text-stone-400">Join virtual sessions, draft clinical SOAP notes, or issue prescriptions.</p>
                 </div>
                 <span className="text-xs font-semibold bg-emerald-50 text-emerald-800 px-3 py-1 rounded-full border border-emerald-100">
                   {appointments.length} Active Sessions
@@ -217,6 +274,11 @@ export default function Dashboard() {
                         <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded capitalize">
                           {app.format}
                         </span>
+                        {app.status === "completed" && (
+                          <span className="text-[10px] font-bold bg-teal-100 text-teal-800 px-2 py-0.5 rounded">
+                            ✓ Session Completed
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-stone-500 mt-1">
                         <span className="font-semibold text-emerald-900">Presenting Concern: </span>
@@ -224,16 +286,22 @@ export default function Dashboard() {
                       </p>
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2">
                       <button
-                        onClick={() => alert(`Prescription unlocked & generated for ${app.client_name}!`)}
-                        className="px-3.5 py-1.5 bg-emerald-950 text-white rounded-lg text-xs font-semibold hover:bg-emerald-900 flex items-center gap-1.5 shadow-sm"
+                        onClick={() => handleJoinSession(app._id)}
+                        className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition"
+                      >
+                        JOIN SESSION 🎥
+                      </button>
+                      <button
+                        onClick={() => handleOpenSoap(app)}
+                        className="px-3.5 py-1.5 bg-emerald-950 text-white rounded-lg text-xs font-semibold hover:bg-emerald-900 flex items-center gap-1.5 shadow-sm transition"
                       >
                         ISSUE RX 💊
                       </button>
                       <button
-                        onClick={() => alert(`Opened Clinical SOAP file for ${app.client_name}.`)}
-                        className="px-3.5 py-1.5 bg-stone-100 text-stone-700 rounded-lg text-xs font-semibold hover:bg-stone-200 border border-stone-200"
+                        onClick={() => handleOpenSoap(app)}
+                        className="px-3.5 py-1.5 bg-stone-100 text-stone-700 rounded-lg text-xs font-semibold hover:bg-stone-200 border border-stone-200 transition"
                       >
                         SOAP 📝
                       </button>
@@ -271,8 +339,12 @@ export default function Dashboard() {
                     </div>
 
                     <div className="pt-4 border-t border-stone-200 flex justify-between items-center text-xs mt-4">
-                      <span className="font-semibold text-emerald-900 cursor-pointer">Issue Rx 💊</span>
-                      <span className="text-stone-500 hover:text-stone-800 cursor-pointer">SOAP File →</span>
+                      <span onClick={() => handleJoinSession(app._id)} className="font-semibold text-emerald-700 hover:text-emerald-900 cursor-pointer">
+                        Join Call 🎥
+                      </span>
+                      <span onClick={() => handleOpenSoap(app)} className="text-stone-500 hover:text-stone-800 cursor-pointer">
+                        SOAP File →
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -280,7 +352,7 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* TAB 3: Practice Analytics */}
+          {/* TAB 3: Analytics */}
           {activeTab === "analytics" && (
             <div>
               <div className="flex justify-between items-center mb-6">
@@ -514,6 +586,118 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {/* Clinical SOAP Modal */}
+      {selectedApp && (
+        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-xl border border-stone-200 p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-stone-100 pb-3 mb-4">
+              <div>
+                <span className="text-[10px] bg-emerald-50 text-emerald-800 font-bold px-2 py-0.5 rounded tracking-wider uppercase">
+                  Clinical Intake Record (SOAP)
+                </span>
+                <h3 className="font-serif font-bold text-lg text-stone-900 mt-1">
+                  Session Notes: {selectedApp.client_name}
+                </h3>
+                <p className="text-xs text-stone-400">{selectedApp.date} @ {selectedApp.slot} • {selectedApp.client_email}</p>
+              </div>
+              <button
+                onClick={() => setSelectedApp(null)}
+                className="text-stone-400 hover:text-stone-600 text-lg font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              <div>
+                <label className="block font-bold uppercase text-[10px] text-stone-600 mb-1">
+                  S — Subjective (Patient Report & Stated Symptoms)
+                </label>
+                <textarea
+                  rows={2}
+                  value={soapData.subjective}
+                  onChange={(e) => setSoapData({ ...soapData, subjective: e.target.value })}
+                  className="w-full p-2.5 border border-stone-200 rounded-lg bg-stone-50/40 text-stone-800 focus:outline-none focus:border-stone-400"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold uppercase text-[10px] text-stone-600 mb-1">
+                  O — Objective (Clinician Behavioral Observations)
+                </label>
+                <textarea
+                  rows={2}
+                  value={soapData.objective}
+                  onChange={(e) => setSoapData({ ...soapData, objective: e.target.value })}
+                  className="w-full p-2.5 border border-stone-200 rounded-lg bg-stone-50/40 text-stone-800 focus:outline-none focus:border-stone-400"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold uppercase text-[10px] text-stone-600 mb-1">
+                  A — Assessment (Clinical Impression & Diagnostic Codes)
+                </label>
+                <textarea
+                  rows={2}
+                  value={soapData.assessment}
+                  onChange={(e) => setSoapData({ ...soapData, assessment: e.target.value })}
+                  className="w-full p-2.5 border border-stone-200 rounded-lg bg-stone-50/40 text-stone-800 focus:outline-none focus:border-stone-400"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold uppercase text-[10px] text-stone-600 mb-1">
+                  P — Plan & Homework Protocols
+                </label>
+                <textarea
+                  rows={2}
+                  value={soapData.plan}
+                  onChange={(e) => setSoapData({ ...soapData, plan: e.target.value })}
+                  className="w-full p-2.5 border border-stone-200 rounded-lg bg-stone-50/40 text-stone-800 focus:outline-none focus:border-stone-400"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold uppercase text-[10px] text-emerald-900 mb-1">
+                  Prescribed Clinical Regimen (Issued to Patient Rx)
+                </label>
+                <textarea
+                  rows={3}
+                  value={soapData.prescribed_regimen}
+                  onChange={(e) => setSoapData({ ...soapData, prescribed_regimen: e.target.value })}
+                  className="w-full p-2.5 border border-emerald-200 rounded-lg bg-emerald-50/20 text-stone-800 focus:outline-none focus:border-emerald-500 font-mono text-[11px]"
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-stone-100 flex justify-between items-center">
+              <span className="text-[11px] text-stone-400 font-mono">
+                {isSigned ? "✓ Digitally Signed & Locked by Dr. Dhanya Krishna" : "Status: Draft Pending Signature"}
+              </span>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={savingNote}
+                  onClick={() => handleSaveSoap(false)}
+                  className="px-4 py-2 border border-stone-200 text-stone-700 rounded-xl text-xs font-semibold hover:bg-stone-50"
+                >
+                  Save Draft
+                </button>
+                <button
+                  type="button"
+                  disabled={savingNote}
+                  onClick={() => handleSaveSoap(true)}
+                  className="px-5 py-2 bg-emerald-950 text-white rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-emerald-900 shadow-sm"
+                >
+                  {isSigned ? "Update Signed Rx 💊" : "Sign & Unlock Patient Rx 💊"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <p className="text-center text-[11px] text-stone-400 mt-8 font-mono">
         © 2026 Dr. Dhanya Krishna Practice • HIPAA / ISO-27001 Active Node
